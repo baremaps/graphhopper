@@ -32,6 +32,7 @@ import com.graphhopper.storage.TurnCostStorage;
 import com.graphhopper.util.BitUtil;
 import com.graphhopper.util.EdgeIterator;
 import com.graphhopper.util.GHUtility;
+import com.graphhopper.util.Helper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -92,10 +93,16 @@ public class CHPreparationGraph {
         BooleanEncodedValue accessEnc = weighting.getFlagEncoder().getAccessEnc();
         AllEdgesIterator iter = graph.getAllEdges();
         while (iter.next()) {
+            if (iter.getEdge() % 1_000_000 == 0) {
+                // todonow: remove again
+                System.out.println("Adding edges to CH preparation graph [" + weighting.getFlagEncoder() + "], " + iter.getEdge() + "/" + graph.getEdges() + " " + Helper.getMemInfo());
+            }
             double weightFwd = iter.get(accessEnc) ? weighting.calcEdgeWeight(iter, false) : Double.POSITIVE_INFINITY;
             double weightBwd = iter.getReverse(accessEnc) ? weighting.calcEdgeWeight(iter, true) : Double.POSITIVE_INFINITY;
             prepareGraph.addEdge(iter.getBaseNode(), iter.getAdjNode(), iter.getEdge(), weightFwd, weightBwd);
         }
+        // todonow: remove again
+        System.out.println("Finished adding edges to CH preparation graph [" + weighting.getFlagEncoder() + "], " + graph.getEdges() + " " + Helper.getMemInfo());
         prepareGraph.prepareForContraction();
     }
 
