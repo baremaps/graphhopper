@@ -145,6 +145,7 @@ public class PrepareContractionHierarchiesTest {
         initExampleGraph(g);
         int old = routingCHGraph.getEdges();
         PrepareContractionHierarchies prepare = createPrepareContractionHierarchies(g);
+        useNodeOrdering(prepare, new int[]{5, 3, 4, 0, 1, 2});
         prepare.doWork();
         assertEquals(old, routingCHGraph.getEdges());
     }
