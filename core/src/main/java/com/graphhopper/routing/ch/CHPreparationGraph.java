@@ -56,11 +56,6 @@ public class CHPreparationGraph {
     private int nextShortcutId;
     private boolean ready;
 
-    private final int[] turnCostNodes;
-    private LongArrayList turnCostEdgePairs;
-    private DoubleArrayList turnCosts;
-    private double uTurnCosts;
-
     public static CHPreparationGraph nodeBased(int nodes, int edges) {
         return new CHPreparationGraph(nodes, edges, false, (in, via, out) -> 0);
     }
@@ -84,9 +79,7 @@ public class CHPreparationGraph {
         origGraphBuilder = edgeBased ? new OrigGraph.Builder() : null;
         neighborSet = new IntHashSet();
         nextShortcutId = edges;
-        turnCostNodes = new int[nodes + 1];
-        turnCostEdgePairs = new LongArrayList();
-        turnCosts = new DoubleArrayList();
+
     }
 
     public static void buildFromGraph(CHPreparationGraph prepareGraph, Graph graph, Weighting weighting) {
@@ -103,38 +96,67 @@ public class CHPreparationGraph {
             double weightBwd = iter.getReverse(accessEnc) ? weighting.calcEdgeWeight(iter, true) : Double.POSITIVE_INFINITY;
             prepareGraph.addEdge(iter.getBaseNode(), iter.getAdjNode(), iter.getEdge(), weightFwd, weightBwd);
         }
+        prepareGraph.prepareForContraction();
+    }
+
+    /**
+     * Builds a turn cost function for a given graph('s turn cost storage) and a weighting.
+     * The trivial implementation would be simply returning {@link Weighting#calcTurnWeight}. However, it turned out
+     * that reading all turn costs for the current encoder and then storing them in separate arrays upfront speeds up
+     * edge-based CH preparation by about 25%. See #2084
+     */
+    public static TurnCostFunction buildTurnCostFunctionFromTurnCostStorage(Graph graph, Weighting weighting) {
         FlagEncoder encoder = weighting.getFlagEncoder();
         String key = TurnCost.key(encoder.toString());
-        if (encoder.hasEncodedValue(key)) {
-            DecimalEncodedValue turnCostEnc = encoder.getDecimalEncodedValue(key);
-            TurnCostStorage tcStorage = graph.getTurnCostStorage();
-            TurnCostStorage.TurnRelationIterator tcIter = tcStorage.getAllTurnRelations();
-            int lastNode = -1;
-            while (tcIter.next()) {
-                int viaNode = tcIter.getViaNode();
-                if (viaNode < lastNode)
-                    throw new IllegalStateException();
-                long edgePair = BitUtil.LITTLE.combineIntsToLong(tcIter.getFromEdge(), tcIter.getToEdge());
-                double turnCost = tcIter.getCost(turnCostEnc);
-                // todonow: do not forget that this is always infinite currently...
-                int index = prepareGraph.turnCostEdgePairs.size();
-                prepareGraph.turnCostEdgePairs.add(edgePair);
-                prepareGraph.turnCosts.add(turnCost);
-                if (viaNode != lastNode) {
-                    for (int i = lastNode + 1; i <= viaNode; i++) {
-                        prepareGraph.turnCostNodes[i] = index;
-                    }
+        if (!encoder.hasEncodedValue(key))
+            return (inEdge, viaNode, outEdge) -> 0;
+
+        DecimalEncodedValue turnCostEnc = encoder.getDecimalEncodedValue(key);
+        TurnCostStorage turnCostStorage = graph.getTurnCostStorage();
+        // we maintain a list of inEdge/outEdge/turn-cost triples (we use two arrays for this) that is sorted by nodes
+        LongArrayList turnCostEdgePairs = new LongArrayList();
+        DoubleArrayList turnCosts = new DoubleArrayList();
+        // for each node we store the index of the first turn cost entry/triple in the list
+        final int[] turnCostNodes = new int[graph.getNodes() + 1];
+        // todonow: get rid of this hack...
+        double uTurnCosts = weighting.calcTurnWeight(1, 0, 1);
+        TurnCostStorage.TurnRelationIterator tcIter = turnCostStorage.getAllTurnRelations();
+        int lastNode = -1;
+        while (tcIter.next()) {
+            int viaNode = tcIter.getViaNode();
+            if (viaNode < lastNode)
+                throw new IllegalStateException();
+            long edgePair = BitUtil.LITTLE.combineIntsToLong(tcIter.getFromEdge(), tcIter.getToEdge());
+            double turnCost = tcIter.getCost(turnCostEnc);
+            // todonow: do not forget that this is always infinite currently...
+            int index = turnCostEdgePairs.size();
+            turnCostEdgePairs.add(edgePair);
+            turnCosts.add(turnCost);
+            if (viaNode != lastNode) {
+                for (int i = lastNode + 1; i <= viaNode; i++) {
+                    turnCostNodes[i] = index;
                 }
-                lastNode = viaNode;
             }
-            for (int i = lastNode + 1; i <= prepareGraph.turnCostNodes.length - 1; i++) {
-                prepareGraph.turnCostNodes[i] = prepareGraph.turnCostEdgePairs.size();
-            }
-            prepareGraph.turnCostNodes[prepareGraph.turnCostNodes.length - 1] = prepareGraph.turnCostEdgePairs.size();
-            // todonow: get rid of this hack...
-            prepareGraph.uTurnCosts = weighting.calcTurnWeight(1, 0, 1);
+            lastNode = viaNode;
         }
-        prepareGraph.prepareForContraction();
+        for (int i = lastNode + 1; i <= turnCostNodes.length - 1; i++) {
+            turnCostNodes[i] = turnCostEdgePairs.size();
+        }
+        turnCostNodes[turnCostNodes.length - 1] = turnCostEdgePairs.size();
+
+        return (inEdge, viaNode, outEdge) -> {
+            if (!EdgeIterator.Edge.isValid(inEdge) || !EdgeIterator.Edge.isValid(outEdge))
+                return 0;
+            else if (inEdge == outEdge)
+                return uTurnCosts;
+            // traverse all turn cost entries we have for this viaNode and return the turn costs if we find a match
+            for (int i = turnCostNodes[viaNode]; i < turnCostNodes[viaNode + 1]; i++) {
+                long l = turnCostEdgePairs.get(i);
+                if (inEdge == BitUtil.LITTLE.getIntLow(l) && outEdge == BitUtil.LITTLE.getIntHigh(l))
+                    return turnCosts.get(i);
+            }
+            return 0;
+        };
     }
 
     public int getNodes() {
@@ -175,7 +197,8 @@ public class CHPreparationGraph {
             origGraphBuilder.addEdge(from, to, edge, fwd, bwd);
     }
 
-    public int addShortcut(int from, int to, int origEdgeKeyFirst, int origEdgeKeyLast, int skipped1, int skipped2, double weight, int origEdgeCount) {
+    public int addShortcut(int from, int to, int origEdgeKeyFirst, int origEdgeKeyLast, int skipped1,
+                           int skipped2, double weight, int origEdgeCount) {
         checkReady();
         PrepareEdge prepareEdge = edgeBased
                 ? new EdgeBasedPrepareShortcut(nextShortcutId, from, to, origEdgeKeyFirst, origEdgeKeyLast, weight, skipped1, skipped2, origEdgeCount)
@@ -218,24 +241,7 @@ public class CHPreparationGraph {
     }
 
     public double getTurnWeight(int inEdge, int viaNode, int outEdge) {
-//        double checkTW = turnCostFunction.getTurnWeight(inEdge, viaNode, outEdge);
-        double res = 0;
-        if (!EdgeIterator.Edge.isValid(inEdge) || !EdgeIterator.Edge.isValid(outEdge))
-            res = 0;
-        else if (inEdge == outEdge) {
-            res = uTurnCosts;
-        } else
-            for (int i = turnCostNodes[viaNode]; i < turnCostNodes[viaNode + 1]; i++) {
-                long l = turnCostEdgePairs.get(i);
-                if (inEdge == BitUtil.LITTLE.getIntLow(l) && outEdge == BitUtil.LITTLE.getIntHigh(l)) {
-                    res = turnCosts.get(i);
-                    break;
-                }
-            }
-//        if (checkTW != res) {
-//            throw new IllegalStateException();
-//        }
-        return res;
+        return turnCostFunction.getTurnWeight(inEdge, viaNode, outEdge);
     }
 
     public IntContainer disconnect(int node) {

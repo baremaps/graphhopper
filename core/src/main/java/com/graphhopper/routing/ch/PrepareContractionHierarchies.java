@@ -88,7 +88,8 @@ public class PrepareContractionHierarchies extends AbstractAlgoPreparation {
             if (turnCostStorage == null) {
                 throw new IllegalArgumentException("For edge-based CH you need a turn cost storage");
             }
-            prepareGraph = CHPreparationGraph.edgeBased(ghStorage.getNodes(), ghStorage.getEdges(), chConfig.getWeighting()::calcTurnWeight);
+            CHPreparationGraph.TurnCostFunction turnCostFunction = CHPreparationGraph.buildTurnCostFunctionFromTurnCostStorage(ghStorage, chConfig.getWeighting());
+            prepareGraph = CHPreparationGraph.edgeBased(ghStorage.getNodes(), ghStorage.getEdges(), turnCostFunction);
             EdgeBasedNodeContractor.ShortcutHandler shortcutInserter = new EdgeBasedShortcutInserter(chGraph);
             nodeContractor = new EdgeBasedNodeContractor(prepareGraph, shortcutInserter, pMap);
         } else {
