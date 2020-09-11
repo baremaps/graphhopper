@@ -72,6 +72,7 @@ class EdgeBasedNodeContractor implements NodeContractor {
     private int numPrevEdges;
     private int numOrigEdges;
     private int numPrevOrigEdges;
+    private int numAllEdges;
 
     // counters used for performance analysis
     private int numPolledEdges;
@@ -108,10 +109,15 @@ class EdgeBasedNodeContractor implements NodeContractor {
     @Override
     public float calculatePriority(int node) {
         activeStats = countingStats;
+        resetEdgeCounters();
+        countPreviousEdges(node);
+        if (numAllEdges == 0)
+            // this node is isolated, maybe it belongs to a removed subnetwork, in any case we can quickly contract it
+            // no shortcuts will be introduced
+            return Float.NEGATIVE_INFINITY;
         stats().stopWatch.start();
         findAndHandlePrepareShortcuts(node, this::countShortcuts);
         stats().stopWatch.stop();
-        countPreviousEdges(node);
         // the higher the priority the later (!) this node will be contracted
         float edgeQuotient = numShortcuts / (float) numPrevEdges;
         float origEdgeQuotient = numOrigEdges / (float) numPrevOrigEdges;
@@ -181,7 +187,6 @@ class EdgeBasedNodeContractor implements NodeContractor {
     private void findAndHandlePrepareShortcuts(int node, PrepareShortcutHandler shortcutHandler) {
         numPolledEdges = 0;
         stats().nodes++;
-        resetEdgeCounters();
         addedShortcuts.clear();
 
         // first we need to identify the possible source nodes from which we can reach the center node
@@ -287,12 +292,14 @@ class EdgeBasedNodeContractor implements NodeContractor {
         // todo: this edge counting can probably be simplified, but we might need to re-optimize heuristic parameters then
         PrepareGraphEdgeIterator outIter = outEdgeExplorer.setBaseNode(node);
         while (outIter.next()) {
+            numAllEdges++;
             numPrevEdges++;
             numPrevOrigEdges += outIter.getOrigEdgeCount();
         }
 
         PrepareGraphEdgeIterator inIter = inEdgeExplorer.setBaseNode(node);
         while (inIter.next()) {
+            numAllEdges++;
             // do not consider loop edges a second time
             if (inIter.getBaseNode() == inIter.getAdjNode())
                 continue;
@@ -373,6 +380,7 @@ class EdgeBasedNodeContractor implements NodeContractor {
         numPrevEdges = 0;
         numOrigEdges = 0;
         numPrevOrigEdges = 0;
+        numAllEdges = 0;
     }
 
     @Override
