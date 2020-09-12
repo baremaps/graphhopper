@@ -360,12 +360,18 @@ public class CHPreparationGraph {
 
         @Override
         public int getOrigEdgeKeyFirst() {
-            return currEdge.getOrigEdgeKeyFirst();
+            if (currEdge.getNodeA() == node)
+                return currEdge.getOrigEdgeKeyFirstAB();
+            else
+                return currEdge.getOrigEdgeKeyFirstBA();
         }
 
         @Override
         public int getOrigEdgeKeyLast() {
-            return currEdge.getOrigEdgeKeyLast();
+            if (currEdge.getNodeA() == node)
+                return currEdge.getOrigEdgeKeyLastAB();
+            else
+                return currEdge.getOrigEdgeKeyLastBA();
         }
 
         @Override
@@ -431,9 +437,13 @@ public class CHPreparationGraph {
 
         double getWeightBA();
 
-        int getOrigEdgeKeyFirst();
+        int getOrigEdgeKeyFirstAB();
 
-        int getOrigEdgeKeyLast();
+        int getOrigEdgeKeyFirstBA();
+
+        int getOrigEdgeKeyLastAB();
+
+        int getOrigEdgeKeyLastBA();
 
         int getSkipped1();
 
@@ -500,14 +510,22 @@ public class CHPreparationGraph {
         }
 
         @Override
-        public int getOrigEdgeKeyFirst() {
-            // todonow!
+        public int getOrigEdgeKeyFirstAB() {
             return origKeyAB;
         }
 
         @Override
-        public int getOrigEdgeKeyLast() {
-            // todonow
+        public int getOrigEdgeKeyFirstBA() {
+            return origKeyBA;
+        }
+
+        @Override
+        public int getOrigEdgeKeyLastAB() {
+            return origKeyAB;
+        }
+
+        @Override
+        public int getOrigEdgeKeyLastBA() {
             return origKeyBA;
         }
 
@@ -603,12 +621,22 @@ public class CHPreparationGraph {
         }
 
         @Override
-        public int getOrigEdgeKeyFirst() {
+        public int getOrigEdgeKeyFirstAB() {
             throw new IllegalStateException("Not supported for node-based shortcuts");
         }
 
         @Override
-        public int getOrigEdgeKeyLast() {
+        public int getOrigEdgeKeyFirstBA() {
+            throw new IllegalStateException("Not supported for node-based shortcuts");
+        }
+
+        @Override
+        public int getOrigEdgeKeyLastAB() {
+            throw new IllegalStateException("Not supported for node-based shortcuts");
+        }
+
+        @Override
+        public int getOrigEdgeKeyLastBA() {
             throw new IllegalStateException("Not supported for node-based shortcuts");
         }
 
@@ -666,12 +694,22 @@ public class CHPreparationGraph {
         }
 
         @Override
-        public int getOrigEdgeKeyFirst() {
+        public int getOrigEdgeKeyFirstAB() {
             return origEdgeKeyFirst;
         }
 
         @Override
-        public int getOrigEdgeKeyLast() {
+        public int getOrigEdgeKeyFirstBA() {
+            return origEdgeKeyFirst;
+        }
+
+        @Override
+        public int getOrigEdgeKeyLastAB() {
+            return origEdgeKeyLast;
+        }
+
+        @Override
+        public int getOrigEdgeKeyLastBA() {
             return origEdgeKeyLast;
         }
 
