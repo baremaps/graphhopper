@@ -34,6 +34,7 @@ import java.util.Locale;
 import java.util.Random;
 
 import static com.graphhopper.routing.ch.CHParameters.*;
+import static com.graphhopper.util.Helper.getMemInfo;
 import static com.graphhopper.util.Helper.nf;
 
 /**
@@ -88,11 +89,13 @@ public class PrepareContractionHierarchies extends AbstractAlgoPreparation {
             if (turnCostStorage == null) {
                 throw new IllegalArgumentException("For edge-based CH you need a turn cost storage");
             }
+            logger.info("Creating CH prepare graph, {}", getMemInfo());
             CHPreparationGraph.TurnCostFunction turnCostFunction = CHPreparationGraph.buildTurnCostFunctionFromTurnCostStorage(ghStorage, chConfig.getWeighting());
             prepareGraph = CHPreparationGraph.edgeBased(ghStorage.getNodes(), ghStorage.getEdges(), turnCostFunction);
             EdgeBasedNodeContractor.ShortcutHandler shortcutInserter = new EdgeBasedShortcutInserter(chGraph);
             nodeContractor = new EdgeBasedNodeContractor(prepareGraph, shortcutInserter, pMap);
         } else {
+            logger.info("Creating CH prepare graph, {}", getMemInfo());
             prepareGraph = CHPreparationGraph.nodeBased(ghStorage.getNodes(), ghStorage.getEdges());
             NodeBasedNodeContractor.ShortcutHandler shortcutInserter = new NodeBasedShortcutHandler(chGraph);
             nodeContractor = new NodeBasedNodeContractor(prepareGraph, shortcutInserter, pMap);
@@ -166,10 +169,10 @@ public class PrepareContractionHierarchies extends AbstractAlgoPreparation {
         // TreeMap is not memory-efficient and PriorityQueue does not support an efficient update method
         // (and is not memory efficient either)
         sortedNodes = new MinHeapWithUpdate(prepareGraph.getNodes());
-        logger.info("Building CH prepare graph");
+        logger.info("Building CH prepare graph, {}", getMemInfo());
         StopWatch sw = new StopWatch().start();
         CHPreparationGraph.buildFromGraph(prepareGraph, graph, getWeighting());
-        logger.info("Finished building CH prepare graph, took: {}s", sw.stop().getSeconds());
+        logger.info("Finished building CH prepare graph, took: {}s, {}", sw.stop().getSeconds(), getMemInfo());
         nodeContractor.initFromGraph();
     }
 
@@ -193,11 +196,11 @@ public class PrepareContractionHierarchies extends AbstractAlgoPreparation {
 
     private void contractNodesUsingHeuristicNodeOrdering() {
         StopWatch sw = new StopWatch().start();
-        logger.info("Building initial queue of nodes to be contracted: {} nodes", prepareGraph.getNodes());
+        logger.info("Building initial queue of nodes to be contracted: {} nodes, {}", prepareGraph.getNodes(), getMemInfo());
         // note that we update the priorities before preparing the node contractor. this does not make much sense,
         // but has always been like that and changing it would possibly require retuning the contraction parameters
         updatePrioritiesOfRemainingNodes();
-        logger.info("Finished building queue, took: {}s", sw.stop().getSeconds());
+        logger.info("Finished building queue, took: {}s, {}", sw.stop().getSeconds(), getMemInfo());
         nodeContractor.prepareContraction();
         final int initSize = sortedNodes.size();
         int level = 0;
