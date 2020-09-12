@@ -184,16 +184,7 @@ public class CHPreparationGraph {
         boolean bwd = Double.isFinite(weightBwd);
         if (!fwd && !bwd)
             return;
-
-        int keyFwd = edge << 1;
-        if (from > to)
-            keyFwd += 1;
-
-        int keyBwd = edge << 1;
-        if (to > from)
-            keyBwd += 1;
-
-        PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, from, to, weightFwd, weightBwd, keyFwd, keyBwd);
+        PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, from, to, weightFwd, weightBwd);
         outEdges.get(from).add(prepareEdge);
         inEdges.get(to).add(prepareEdge);
         outEdges.get(to).add(prepareEdge);
@@ -393,7 +384,8 @@ public class CHPreparationGraph {
                 return currEdge.getWeightBA();
             else if (sitsAtA)
                 return currEdge.getWeightBA();
-            else return currEdge.getWeightAB();
+            else
+                return currEdge.getWeightAB();
         }
 
         @Override
@@ -466,17 +458,13 @@ public class CHPreparationGraph {
         private final int nodeB;
         private final double weightAB;
         private final double weightBA;
-        private final int origKeyAB;
-        private final int origKeyBA;
 
-        private PrepareBaseEdge(int prepareEdge, int nodeA, int nodeB, double weightAB, double weightBA, int origKeyAB, int origKeyBA) {
+        private PrepareBaseEdge(int prepareEdge, int nodeA, int nodeB, double weightAB, double weightBA) {
             this.prepareEdge = prepareEdge;
             this.nodeA = nodeA;
             this.nodeB = nodeB;
             this.weightAB = weightAB;
             this.weightBA = weightBA;
-            this.origKeyAB = origKeyAB;
-            this.origKeyBA = origKeyBA;
         }
 
         @Override
@@ -511,22 +499,34 @@ public class CHPreparationGraph {
 
         @Override
         public int getOrigEdgeKeyFirstAB() {
-            return origKeyAB;
+            int keyFwd = prepareEdge << 1;
+            if (nodeA > nodeB)
+                keyFwd += 1;
+            return keyFwd;
         }
 
         @Override
         public int getOrigEdgeKeyFirstBA() {
-            return origKeyBA;
+            int keyBwd = prepareEdge << 1;
+            if (nodeB > nodeA)
+                keyBwd += 1;
+            return keyBwd;
         }
 
         @Override
         public int getOrigEdgeKeyLastAB() {
-            return origKeyAB;
+            int keyFwd = prepareEdge << 1;
+            if (nodeA > nodeB)
+                keyFwd += 1;
+            return keyFwd;
         }
 
         @Override
         public int getOrigEdgeKeyLastBA() {
-            return origKeyBA;
+            int keyBwd = prepareEdge << 1;
+            if (nodeB > nodeA)
+                keyBwd += 1;
+            return keyBwd;
         }
 
         @Override
@@ -566,7 +566,7 @@ public class CHPreparationGraph {
 
         @Override
         public String toString() {
-            return nodeA + "-" + nodeB + " (" + origKeyAB + ", " + origKeyBA + ") " + weightAB + " " + weightBA;
+            return nodeA + "-" + nodeB + " (" + prepareEdge + ") " + weightAB + " " + weightBA;
         }
     }
 
