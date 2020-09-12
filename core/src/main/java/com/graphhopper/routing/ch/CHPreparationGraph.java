@@ -34,12 +34,6 @@ import com.graphhopper.util.EdgeIterator;
 import com.graphhopper.util.GHUtility;
 import com.graphhopper.util.Helper;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.IntStream;
-
-import static java.util.stream.Collectors.toList;
-
 /**
  * Graph data structure used for CH preparation. It allows caching weights and edges that are not needed anymore
  * (those adjacent to contracted nodes) can be removed (see {@link #disconnect}.
@@ -49,8 +43,8 @@ public class CHPreparationGraph {
     private final int edges;
     private final boolean edgeBased;
     private final TurnCostFunction turnCostFunction;
-    private List<List<PrepareEdge>> outEdges;
-    private List<List<PrepareEdge>> inEdges;
+    private MyListOfLists outEdges;
+    private MyListOfLists inEdges;
     private IntSet neighborSet;
     private OrigGraph origGraph;
     private OrigGraph.Builder origGraphBuilder;
@@ -75,8 +69,8 @@ public class CHPreparationGraph {
         this.nodes = nodes;
         this.edges = edges;
         this.edgeBased = edgeBased;
-        outEdges = IntStream.range(0, nodes).<List<PrepareEdge>>mapToObj(i -> new ArrayList<>(0)).collect(toList());
-        inEdges = IntStream.range(0, nodes).<List<PrepareEdge>>mapToObj(i -> new ArrayList<>(0)).collect(toList());
+        outEdges = new MyListOfLists(nodes, 2);
+        inEdges = new MyListOfLists(nodes, 2);
         origGraphBuilder = edgeBased ? new OrigGraph.Builder() : null;
         neighborSet = new IntHashSet();
         nextShortcutId = edges;
@@ -175,7 +169,7 @@ public class CHPreparationGraph {
     }
 
     public int getDegree(int node) {
-        return outEdges.get(node).size() + inEdges.get(node).size();
+        return outEdges.getEdges(node) + inEdges.getEdges(node);
     }
 
     public void addEdge(int from, int to, int edge, double weightFwd, double weightBwd) {
@@ -186,10 +180,10 @@ public class CHPreparationGraph {
             return;
         // todonow: is it ok to cast to float? maybe add some check that asserts certain precision? especially inf?
         PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, from, to, (float) weightFwd, (float) weightBwd);
-        outEdges.get(from).add(prepareEdge);
-        inEdges.get(to).add(prepareEdge);
-        outEdges.get(to).add(prepareEdge);
-        inEdges.get(from).add(prepareEdge);
+        outEdges.add(from, prepareEdge);
+        inEdges.add(to, prepareEdge);
+        outEdges.add(to, prepareEdge);
+        inEdges.add(from, prepareEdge);
 
         if (edgeBased)
             origGraphBuilder.addEdge(from, to, edge, fwd, bwd);
@@ -201,8 +195,8 @@ public class CHPreparationGraph {
         PrepareEdge prepareEdge = edgeBased
                 ? new EdgeBasedPrepareShortcut(nextShortcutId, from, to, origEdgeKeyFirst, origEdgeKeyLast, weight, skipped1, skipped2, origEdgeCount)
                 : new PrepareShortcut(nextShortcutId, from, to, weight, skipped1, skipped2, origEdgeCount);
-        outEdges.get(from).add(prepareEdge);
-        inEdges.get(to).add(prepareEdge);
+        outEdges.add(from, prepareEdge);
+        inEdges.add(to, prepareEdge);
         return nextShortcutId++;
     }
 
@@ -248,28 +242,30 @@ public class CHPreparationGraph {
         // node ids
         neighborSet.clear();
         IntArrayList neighbors = new IntArrayList(getDegree(node));
-        for (PrepareEdge prepareEdge : outEdges.get(node)) {
+        for (int i = 0; i < outEdges.getEdges(node); i++) {
+            PrepareEdge prepareEdge = outEdges.get(node, i);
             int adjNode = prepareEdge.getNodeB();
             if (adjNode == node)
                 adjNode = prepareEdge.getNodeA();
             if (adjNode == node)
                 continue;
-            inEdges.get(adjNode).removeIf(a -> a == prepareEdge);
+            inEdges.remove(adjNode, prepareEdge);
             if (neighborSet.add(adjNode))
                 neighbors.add(adjNode);
         }
-        for (PrepareEdge prepareEdge : inEdges.get(node)) {
+        for (int i = 0; i < inEdges.getEdges(node); i++) {
+            PrepareEdge prepareEdge = inEdges.get(node, i);
             int adjNode = prepareEdge.getNodeA();
             if (adjNode == node)
                 adjNode = prepareEdge.getNodeB();
             if (adjNode == node)
                 continue;
-            outEdges.get(adjNode).removeIf(a -> a == prepareEdge);
+            outEdges.remove(adjNode, prepareEdge);
             if (neighborSet.add(adjNode))
                 neighbors.add(adjNode);
         }
-        outEdges.set(node, null);
-        inEdges.set(node, null);
+        outEdges.clear(node);
+        inEdges.clear(node);
         return neighbors;
     }
 
@@ -298,14 +294,13 @@ public class CHPreparationGraph {
     }
 
     private static class PrepareGraphEdgeExplorerImpl implements PrepareGraphEdgeExplorer, PrepareGraphEdgeIterator {
-        private final List<List<PrepareEdge>> prepareEdges;
+        private final MyListOfLists prepareEdges;
         private final boolean reverse;
-        private int node;
-        private List<PrepareEdge> prepareEdgesAtNode;
+        private int node = -1;
         private PrepareEdge currEdge;
         private int index;
 
-        PrepareGraphEdgeExplorerImpl(List<List<PrepareEdge>> prepareEdges, boolean reverse) {
+        PrepareGraphEdgeExplorerImpl(MyListOfLists prepareEdges, boolean reverse) {
             this.prepareEdges = prepareEdges;
             this.reverse = reverse;
         }
@@ -313,8 +308,6 @@ public class CHPreparationGraph {
         @Override
         public PrepareGraphEdgeIterator setBaseNode(int node) {
             this.node = node;
-            this.prepareEdgesAtNode = prepareEdges.get(node);
-            assert prepareEdgesAtNode != null;
             this.index = -1;
             return this;
         }
@@ -322,8 +315,8 @@ public class CHPreparationGraph {
         @Override
         public boolean next() {
             index++;
-            boolean result = index < prepareEdgesAtNode.size();
-            currEdge = result ? prepareEdgesAtNode.get(index) : null;
+            boolean result = index < prepareEdges.getEdges(node);
+            currEdge = result ? prepareEdges.get(node, index) : null;
             return result;
         }
 
@@ -417,7 +410,7 @@ public class CHPreparationGraph {
         }
     }
 
-    private interface PrepareEdge {
+    interface PrepareEdge {
         boolean isShortcut();
 
         int getPrepareEdge();
@@ -453,14 +446,14 @@ public class CHPreparationGraph {
         void setOrigEdgeCount(int origEdgeCount);
     }
 
-    private static class PrepareBaseEdge implements PrepareEdge {
+    public static class PrepareBaseEdge implements PrepareEdge {
         private final int prepareEdge;
         private final int nodeA;
         private final int nodeB;
         private final float weightAB;
         private final float weightBA;
 
-        private PrepareBaseEdge(int prepareEdge, int nodeA, int nodeB, float weightAB, float weightBA) {
+        public PrepareBaseEdge(int prepareEdge, int nodeA, int nodeB, float weightAB, float weightBA) {
             this.prepareEdge = prepareEdge;
             this.nodeA = nodeA;
             this.nodeB = nodeB;

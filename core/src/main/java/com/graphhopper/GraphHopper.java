@@ -23,7 +23,10 @@ import com.graphhopper.config.Profile;
 import com.graphhopper.reader.DataReader;
 import com.graphhopper.reader.dem.*;
 import com.graphhopper.reader.osm.conditional.DateRangeParser;
-import com.graphhopper.routing.*;
+import com.graphhopper.routing.DefaultWeightingFactory;
+import com.graphhopper.routing.Router;
+import com.graphhopper.routing.RouterConfig;
+import com.graphhopper.routing.WeightingFactory;
 import com.graphhopper.routing.ch.CHPreparationHandler;
 import com.graphhopper.routing.ev.DefaultEncodedValueFactory;
 import com.graphhopper.routing.ev.EncodedValueFactory;
@@ -933,10 +936,13 @@ public class GraphHopper implements GraphHopperAPI {
 
         importPublicTransit();
 
+        logger.info("start with LM {}", getMemInfo());
         if (lmPreparationHandler.isEnabled())
             lmPreparationHandler.createPreparations(ghStorage, locationIndex);
         loadOrPrepareLM(closeEarly);
+        logger.info("done with LM {}", getMemInfo());
 
+        logger.info("start with CH {}", getMemInfo());
         if (chPreparationHandler.isEnabled())
             chPreparationHandler.createPreparations(ghStorage);
         if (isCHPrepared()) {
@@ -948,6 +954,7 @@ public class GraphHopper implements GraphHopperAPI {
         } else {
             prepareCH(closeEarly);
         }
+        logger.info("done with CH {}", getMemInfo());
     }
 
     protected void registerCustomEncodedValues(EncodingManager.Builder emBuilder) {
