@@ -184,7 +184,8 @@ public class CHPreparationGraph {
         boolean bwd = Double.isFinite(weightBwd);
         if (!fwd && !bwd)
             return;
-        PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, from, to, weightFwd, weightBwd);
+        // todonow: is it ok to cast to float? maybe add some check that asserts certain precision? especially inf?
+        PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, from, to, (float) weightFwd, (float) weightBwd);
         outEdges.get(from).add(prepareEdge);
         inEdges.get(to).add(prepareEdge);
         outEdges.get(to).add(prepareEdge);
@@ -456,10 +457,10 @@ public class CHPreparationGraph {
         private final int prepareEdge;
         private final int nodeA;
         private final int nodeB;
-        private final double weightAB;
-        private final double weightBA;
+        private final float weightAB;
+        private final float weightBA;
 
-        private PrepareBaseEdge(int prepareEdge, int nodeA, int nodeB, double weightAB, double weightBA) {
+        private PrepareBaseEdge(int prepareEdge, int nodeA, int nodeB, float weightAB, float weightBA) {
             this.prepareEdge = prepareEdge;
             this.nodeA = nodeA;
             this.nodeB = nodeB;
