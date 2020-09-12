@@ -18,8 +18,6 @@
 package com.graphhopper.util;
 
 import java.io.*;
-import java.lang.management.GarbageCollectorMXBean;
-import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.charset.Charset;
@@ -166,38 +164,7 @@ public class Helper {
     }
 
     public static String getMemInfo() {
-        // todonow: revert
-        return "totalMB:" + getTotalMB() + ", usedMB:" + getUsedMBAfterGC();
-    }
-
-    // todonow: remove
-    private static int getUsedMBAfterGC() {
-        gcAndWait();
-        long result = (ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed() +
-                ManagementFactory.getMemoryMXBean().getNonHeapMemoryUsage().getUsed()) / (1024 * 1024);
-        return (int) result;
-    }
-
-    // todonow: remove
-    private static void gcAndWait() {
-        long before = getTotalGcCount();
-        // trigger gc
-        System.gc();
-        while (getTotalGcCount() == before) {
-            // wait for the gc to have completed
-        }
-    }
-
-    // todonow: remove
-    private static long getTotalGcCount() {
-        long sum = 0;
-        for (GarbageCollectorMXBean b : ManagementFactory.getGarbageCollectorMXBeans()) {
-            long count = b.getCollectionCount();
-            if (count != -1) {
-                sum += count;
-            }
-        }
-        return sum;
+        return "totalMB:" + getTotalMB() + ", usedMB:" + getUsedMB();
     }
 
     public static int getSizeOfObjectRef(int factor) {
