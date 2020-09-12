@@ -180,9 +180,9 @@ public class CHPreparationHandler {
 
     public void prepare(final StorableProperties properties, final boolean closeEarly) {
         ExecutorCompletionService<String> completionService = new ExecutorCompletionService<>(threadPool);
-        int[] counter = {0};
+        int counter = 0;
         for (final PrepareContractionHierarchies prepare : preparations) {
-            LOGGER.info((++counter[0]) + "/" + preparations.size() + " calling " +
+            LOGGER.info((++counter) + "/" + preparations.size() + " calling " +
                     "CH prepare.doWork for profile '" + prepare.getCHConfig().getName() + "' " + prepare.getCHConfig().getTraversalMode() + " ... (" + getMemInfo() + ")");
             final String name = prepare.getCHConfig().getName();
             completionService.submit(new Runnable() {
@@ -190,14 +190,6 @@ public class CHPreparationHandler {
                 public void run() {
                     // toString is not taken into account so we need to cheat, see http://stackoverflow.com/q/6113746/194609 for other options
                     Thread.currentThread().setName(name);
-                    // todonow: remove?
-                    int delay = pMap.getInt("ch.preparation.delay", 0);
-                    LOGGER.info("Starting {} with delay {}s", name, delay);
-                    try {
-                        Thread.sleep((counter[0] - 1) * delay * 1000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
                     prepare.doWork();
                     if (closeEarly)
                         prepare.close();

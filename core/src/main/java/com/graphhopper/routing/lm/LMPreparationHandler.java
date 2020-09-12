@@ -206,7 +206,6 @@ public class LMPreparationHandler {
                     if (closeEarly) {
                         plm.close();
                     }
-                    LOGGER.info("LM {} finished {}", name, getMemInfo());
                     properties.put(Landmark.PREPARE + "date." + name, createFormatter().format(new Date()));
                 }
             }, name);

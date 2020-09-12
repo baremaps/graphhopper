@@ -936,13 +936,10 @@ public class GraphHopper implements GraphHopperAPI {
 
         importPublicTransit();
 
-        logger.info("start with LM {}", getMemInfo());
         if (lmPreparationHandler.isEnabled())
             lmPreparationHandler.createPreparations(ghStorage, locationIndex);
         loadOrPrepareLM(closeEarly);
-        logger.info("done with LM {}", getMemInfo());
 
-        logger.info("start with CH {}", getMemInfo());
         if (chPreparationHandler.isEnabled())
             chPreparationHandler.createPreparations(ghStorage);
         if (isCHPrepared()) {
@@ -954,7 +951,6 @@ public class GraphHopper implements GraphHopperAPI {
         } else {
             prepareCH(closeEarly);
         }
-        logger.info("done with CH {}", getMemInfo());
     }
 
     protected void registerCustomEncodedValues(EncodingManager.Builder emBuilder) {
