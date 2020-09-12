@@ -184,22 +184,21 @@ public class CHPreparationGraph {
         boolean bwd = Double.isFinite(weightBwd);
         if (!fwd && !bwd)
             return;
-        if (fwd) {
-            int key = edge << 1;
-            if (from > to)
-                key += 1;
-            PrepareEdge prepareEdge = new PrepareBaseEdge(edge, from, to, weightFwd, key);
-            outEdges.get(from).add(prepareEdge);
-            inEdges.get(to).add(prepareEdge);
-        }
-        if (bwd) {
-            int key = edge << 1;
-            if (to > from)
-                key += 1;
-            PrepareEdge prepareEdge = new PrepareBaseEdge(edge, to, from, weightBwd, key);
-            outEdges.get(to).add(prepareEdge);
-            inEdges.get(from).add(prepareEdge);
-        }
+
+        int keyFwd = edge << 1;
+        if (from > to)
+            keyFwd += 1;
+
+        int keyBwd = edge << 1;
+        if (to > from)
+            keyBwd += 1;
+
+        PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, from, to, weightFwd, weightBwd, keyFwd, keyBwd);
+        outEdges.get(from).add(prepareEdge);
+        inEdges.get(to).add(prepareEdge);
+        outEdges.get(to).add(prepareEdge);
+        inEdges.get(from).add(prepareEdge);
+
         if (edgeBased)
             origGraphBuilder.addEdge(from, to, edge, fwd, bwd);
     }
@@ -258,7 +257,9 @@ public class CHPreparationGraph {
         neighborSet.clear();
         IntArrayList neighbors = new IntArrayList(getDegree(node));
         for (PrepareEdge prepareEdge : outEdges.get(node)) {
-            int adjNode = prepareEdge.getTo();
+            int adjNode = prepareEdge.getNodeB();
+            if (adjNode == node)
+                adjNode = prepareEdge.getNodeA();
             if (adjNode == node)
                 continue;
             inEdges.get(adjNode).removeIf(a -> a == prepareEdge);
@@ -266,7 +267,9 @@ public class CHPreparationGraph {
                 neighbors.add(adjNode);
         }
         for (PrepareEdge prepareEdge : inEdges.get(node)) {
-            int adjNode = prepareEdge.getFrom();
+            int adjNode = prepareEdge.getNodeA();
+            if (adjNode == node)
+                adjNode = prepareEdge.getNodeB();
             if (adjNode == node)
                 continue;
             outEdges.get(adjNode).removeIf(a -> a == prepareEdge);
@@ -305,6 +308,7 @@ public class CHPreparationGraph {
     private static class PrepareGraphEdgeExplorerImpl implements PrepareGraphEdgeExplorer, PrepareGraphEdgeIterator {
         private final List<List<PrepareEdge>> prepareEdges;
         private final boolean reverse;
+        private int node;
         private List<PrepareEdge> prepareEdgesAtNode;
         private PrepareEdge currEdge;
         private int index;
@@ -316,6 +320,7 @@ public class CHPreparationGraph {
 
         @Override
         public PrepareGraphEdgeIterator setBaseNode(int node) {
+            this.node = node;
             this.prepareEdgesAtNode = prepareEdges.get(node);
             assert prepareEdgesAtNode != null;
             this.index = -1;
@@ -332,12 +337,15 @@ public class CHPreparationGraph {
 
         @Override
         public int getBaseNode() {
-            return reverse ? currEdge.getTo() : currEdge.getFrom();
+            return node;
         }
 
         @Override
         public int getAdjNode() {
-            return reverse ? currEdge.getFrom() : currEdge.getTo();
+            if (currEdge.getNodeA() == node)
+                return currEdge.getNodeB();
+            else
+                return currEdge.getNodeA();
         }
 
         @Override
@@ -372,7 +380,14 @@ public class CHPreparationGraph {
 
         @Override
         public double getWeight() {
-            return currEdge.getWeight();
+            boolean sitsAtA = node == currEdge.getNodeA();
+            if (!reverse && sitsAtA)
+                return currEdge.getWeightAB();
+            else if (!reverse)
+                return currEdge.getWeightBA();
+            else if (sitsAtA)
+                return currEdge.getWeightBA();
+            else return currEdge.getWeightAB();
         }
 
         @Override
@@ -408,11 +423,13 @@ public class CHPreparationGraph {
 
         int getPrepareEdge();
 
-        int getFrom();
+        int getNodeA();
 
-        int getTo();
+        int getNodeB();
 
-        double getWeight();
+        double getWeightAB();
+
+        double getWeightBA();
 
         int getOrigEdgeKeyFirst();
 
@@ -435,18 +452,21 @@ public class CHPreparationGraph {
 
     private static class PrepareBaseEdge implements PrepareEdge {
         private final int prepareEdge;
-        private final int from;
-        private final int to;
-        private final double weight;
-        private final int origKey;
+        private final int nodeA;
+        private final int nodeB;
+        private final double weightAB;
+        private final double weightBA;
+        private final int origKeyAB;
+        private final int origKeyBA;
 
-        private PrepareBaseEdge(int prepareEdge, int from, int to, double weight, int origKey) {
+        private PrepareBaseEdge(int prepareEdge, int nodeA, int nodeB, double weightAB, double weightBA, int origKeyAB, int origKeyBA) {
             this.prepareEdge = prepareEdge;
-            this.from = from;
-            this.to = to;
-            assert Double.isFinite(weight);
-            this.weight = weight;
-            this.origKey = origKey;
+            this.nodeA = nodeA;
+            this.nodeB = nodeB;
+            this.weightAB = weightAB;
+            this.weightBA = weightBA;
+            this.origKeyAB = origKeyAB;
+            this.origKeyBA = origKeyBA;
         }
 
         @Override
@@ -460,28 +480,35 @@ public class CHPreparationGraph {
         }
 
         @Override
-        public int getFrom() {
-            return from;
+        public int getNodeA() {
+            return nodeA;
         }
 
         @Override
-        public int getTo() {
-            return to;
+        public int getNodeB() {
+            return nodeB;
         }
 
         @Override
-        public double getWeight() {
-            return weight;
+        public double getWeightAB() {
+            return weightAB;
+        }
+
+        @Override
+        public double getWeightBA() {
+            return weightBA;
         }
 
         @Override
         public int getOrigEdgeKeyFirst() {
-            return origKey;
+            // todonow!
+            return origKeyAB;
         }
 
         @Override
         public int getOrigEdgeKeyLast() {
-            return origKey;
+            // todonow
+            return origKeyBA;
         }
 
         @Override
@@ -521,7 +548,7 @@ public class CHPreparationGraph {
 
         @Override
         public String toString() {
-            return from + "-" + to + " (" + origKey + ") " + weight;
+            return nodeA + "-" + nodeB + " (" + origKeyAB + ", " + origKeyBA + ") " + weightAB + " " + weightBA;
         }
     }
 
@@ -556,17 +583,22 @@ public class CHPreparationGraph {
         }
 
         @Override
-        public int getFrom() {
+        public int getNodeA() {
             return from;
         }
 
         @Override
-        public int getTo() {
+        public int getNodeB() {
             return to;
         }
 
         @Override
-        public double getWeight() {
+        public double getWeightAB() {
+            return weight;
+        }
+
+        @Override
+        public double getWeightBA() {
             return weight;
         }
 
@@ -645,7 +677,7 @@ public class CHPreparationGraph {
 
         @Override
         public String toString() {
-            return getFrom() + "-" + getTo() + " (" + origEdgeKeyFirst + ", " + origEdgeKeyLast + ") " + getWeight();
+            return getNodeA() + "-" + getNodeB() + " (" + origEdgeKeyFirst + ", " + origEdgeKeyLast + ") " + getWeightAB();
         }
     }
 
