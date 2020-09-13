@@ -103,7 +103,7 @@ class NodeBasedNodeContractor implements NodeContractor {
         // |shortcuts(v)| − |{(u, v) | v uncontracted}| − |{(v, w) | v uncontracted}|
         // meanDegree is used instead of outDegree+inDegree as if one adjNode is in both directions
         // only one bucket memory is used. Additionally one shortcut could also stand for two directions.
-        int edgeDifference = shortcutsCount - prepareGraph.getDegree(node);
+        int edgeDifference = shortcutsCount - 2 * prepareGraph.getDegree(node);
 
         // according to the paper do a simple linear combination of the properties to get the priority.
         return params.edgeDifferenceWeight * edgeDifference +
