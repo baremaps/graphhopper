@@ -171,7 +171,8 @@ public class CHPreparationGraph {
         // todonow: is it ok to cast to float? maybe add some check that asserts certain precision? especially inf?
         PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, from, to, (float) weightFwd, (float) weightBwd);
         inoutedges.add(from, prepareEdge);
-        inoutedges.add(to, prepareEdge);
+        if (from != to)
+            inoutedges.add(to, prepareEdge);
 
         if (edgeBased)
             origGraphBuilder.addEdge(from, to, edge, fwd, bwd);
@@ -184,7 +185,8 @@ public class CHPreparationGraph {
                 ? new EdgeBasedPrepareShortcut(nextShortcutId, from, to, origEdgeKeyFirst, origEdgeKeyLast, weight, skipped1, skipped2, origEdgeCount)
                 : new PrepareShortcut(nextShortcutId, from, to, weight, skipped1, skipped2, origEdgeCount);
         inoutedges.add(from, prepareEdge);
-        inoutedges.add(to, prepareEdge);
+        if (from != to)
+            inoutedges.add(to, prepareEdge);
         return nextShortcutId++;
     }
 
