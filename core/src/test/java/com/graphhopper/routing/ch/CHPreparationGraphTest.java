@@ -34,7 +34,7 @@ class CHPreparationGraphTest {
         // |
         // 3<-1
         CHPreparationGraph pg = CHPreparationGraph.nodeBased(5, 10);
-        double inf = Double.POSITIVE_INFINITY;
+        float inf = Float.POSITIVE_INFINITY;
         pg.addEdge(0, 4, 3, 10, inf);
         pg.addEdge(4, 2, 0, inf, 5);
         pg.addEdge(0, 3, 1, 6, 6);
