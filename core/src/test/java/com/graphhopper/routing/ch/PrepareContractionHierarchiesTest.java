@@ -147,7 +147,7 @@ public class PrepareContractionHierarchiesTest {
         PrepareContractionHierarchies prepare = createPrepareContractionHierarchies(g);
         useNodeOrdering(prepare, new int[]{5, 3, 4, 0, 1, 2});
         prepare.doWork();
-        assertEquals(old, routingCHGraph.getEdges());
+        assertEquals(old + 2, routingCHGraph.getEdges());
     }
 
     @Test

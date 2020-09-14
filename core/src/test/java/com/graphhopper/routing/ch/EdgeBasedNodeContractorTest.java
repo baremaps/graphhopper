@@ -1057,9 +1057,9 @@ public class EdgeBasedNodeContractorTest {
                 createShortcut(5, 2, 5, 1, 5, 1, 75, true, false),
                 // from node 5 contraction
                 createShortcut(2, 2, 3, 2, 3, 2, 99, true, false),
-                createShortcut(2, 2, 3, 1, 3, 6, 134, true, false),
+                createShortcut(2, 2, 3, 1, 3, 7, 134, true, false),
                 createShortcut(2, 2, 1, 2, 8, 2, 114, true, false),
-                createShortcut(3, 2, 2, 4, 2, 7, 106, false, true),
+                createShortcut(3, 2, 2, 4, 2, 6, 106, false, true),
                 createShortcut(3, 2, 4, 2, 9, 2, 105, true, false)
         );
     }
