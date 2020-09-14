@@ -33,6 +33,8 @@ import com.graphhopper.util.BitUtil;
 import com.graphhopper.util.EdgeIterator;
 import com.graphhopper.util.GHUtility;
 
+import java.util.Arrays;
+
 /**
  * Graph data structure used for CH preparation. It allows caching weights and edges that are not needed anymore
  * (those adjacent to contracted nodes) can be removed (see {@link #disconnect}.
@@ -42,7 +44,7 @@ public class CHPreparationGraph {
     private final int edges;
     private final boolean edgeBased;
     private final TurnCostFunction turnCostFunction;
-    private MyListOfLists inoutedges;
+    private Array2D<PrepareEdge> prepareEdges;
     private IntSet neighborSet;
     private OrigGraph origGraph;
     private OrigGraph.Builder origGraphBuilder;
@@ -67,7 +69,7 @@ public class CHPreparationGraph {
         this.nodes = nodes;
         this.edges = edges;
         this.edgeBased = edgeBased;
-        inoutedges = new MyListOfLists(nodes, 2);
+        prepareEdges = new Array2D<>(nodes, 2);
         origGraphBuilder = edgeBased ? new OrigGraph.Builder() : null;
         neighborSet = new IntHashSet();
         nextShortcutId = edges;
@@ -109,7 +111,7 @@ public class CHPreparationGraph {
         DoubleArrayList turnCosts = new DoubleArrayList();
         // for each node we store the index of the first turn cost entry/triple in the list
         final int[] turnCostNodes = new int[graph.getNodes() + 1];
-        // todonow: get rid of this hack...
+        // todonow: get rid of this hack... / obtain the u-turn costs directly from weighting
         double uTurnCosts = weighting.calcTurnWeight(1, 0, 1);
         TurnCostStorage.TurnRelationIterator tcIter = turnCostStorage.getAllTurnRelations();
         int lastNode = -1;
@@ -119,7 +121,7 @@ public class CHPreparationGraph {
                 throw new IllegalStateException();
             long edgePair = BitUtil.LITTLE.combineIntsToLong(tcIter.getFromEdge(), tcIter.getToEdge());
             double turnCost = tcIter.getCost(turnCostEnc);
-            // todonow: do not forget that this is always infinite currently...
+            // todonow: do not forget that for pure OSM this is always infinite currently...
             int index = turnCostEdgePairs.size();
             turnCostEdgePairs.add(edgePair);
             turnCosts.add(turnCost);
@@ -159,7 +161,7 @@ public class CHPreparationGraph {
     }
 
     public int getDegree(int node) {
-        return inoutedges.getEdges(node);
+        return prepareEdges.size(node);
     }
 
     public void addEdge(int from, int to, int edge, double weightFwd, double weightBwd) {
@@ -170,9 +172,9 @@ public class CHPreparationGraph {
             return;
         // todonow: is it ok to cast to float? maybe add some check that asserts certain precision? especially inf?
         PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, from, to, (float) weightFwd, (float) weightBwd);
-        inoutedges.add(from, prepareEdge);
+        prepareEdges.add(from, prepareEdge);
         if (from != to)
-            inoutedges.add(to, prepareEdge);
+            prepareEdges.add(to, prepareEdge);
 
         if (edgeBased)
             origGraphBuilder.addEdge(from, to, edge, fwd, bwd);
@@ -184,9 +186,9 @@ public class CHPreparationGraph {
         PrepareEdge prepareEdge = edgeBased
                 ? new EdgeBasedPrepareShortcut(nextShortcutId, from, to, origEdgeKeyFirst, origEdgeKeyLast, weight, skipped1, skipped2, origEdgeCount)
                 : new PrepareShortcut(nextShortcutId, from, to, weight, skipped1, skipped2, origEdgeCount);
-        inoutedges.add(from, prepareEdge);
+        prepareEdges.add(from, prepareEdge);
         if (from != to)
-            inoutedges.add(to, prepareEdge);
+            prepareEdges.add(to, prepareEdge);
         return nextShortcutId++;
     }
 
@@ -200,12 +202,12 @@ public class CHPreparationGraph {
 
     public PrepareGraphEdgeExplorer createOutEdgeExplorer() {
         checkReady();
-        return new PrepareGraphEdgeExplorerImpl(inoutedges, false);
+        return new PrepareGraphEdgeExplorerImpl(prepareEdges, false);
     }
 
     public PrepareGraphEdgeExplorer createInEdgeExplorer() {
         checkReady();
-        return new PrepareGraphEdgeExplorerImpl(inoutedges, true);
+        return new PrepareGraphEdgeExplorerImpl(prepareEdges, true);
     }
 
     public PrepareGraphOrigEdgeExplorer createOutOrigEdgeExplorer() {
@@ -232,24 +234,25 @@ public class CHPreparationGraph {
         // node ids
         neighborSet.clear();
         IntArrayList neighbors = new IntArrayList(getDegree(node));
-        for (int i = 0; i < inoutedges.getEdges(node); i++) {
-            PrepareEdge prepareEdge = inoutedges.get(node, i);
+        for (int i = 0; i < prepareEdges.size(node); i++) {
+            PrepareEdge prepareEdge = prepareEdges.get(node, i);
             int adjNode = prepareEdge.getNodeB();
             if (adjNode == node)
                 adjNode = prepareEdge.getNodeA();
             if (adjNode == node)
+                // this is a loop
                 continue;
-            inoutedges.remove(adjNode, prepareEdge);
+            prepareEdges.remove(adjNode, prepareEdge);
             if (neighborSet.add(adjNode))
                 neighbors.add(adjNode);
         }
-        inoutedges.clear(node);
+        prepareEdges.clear(node);
         return neighbors;
     }
 
     public void close() {
         checkReady();
-        inoutedges = null;
+        prepareEdges = null;
         neighborSet = null;
         if (edgeBased)
             origGraph = null;
@@ -271,13 +274,13 @@ public class CHPreparationGraph {
     }
 
     private static class PrepareGraphEdgeExplorerImpl implements PrepareGraphEdgeExplorer, PrepareGraphEdgeIterator {
-        private final MyListOfLists prepareEdges;
+        private final Array2D<PrepareEdge> prepareEdges;
         private final boolean reverse;
         private int node = -1;
         private PrepareEdge currEdge;
         private int index;
 
-        PrepareGraphEdgeExplorerImpl(MyListOfLists prepareEdges, boolean reverse) {
+        PrepareGraphEdgeExplorerImpl(Array2D<PrepareEdge> prepareEdges, boolean reverse) {
             this.prepareEdges = prepareEdges;
             this.reverse = reverse;
         }
@@ -293,13 +296,14 @@ public class CHPreparationGraph {
         public boolean next() {
             while (true) {
                 index++;
-                boolean result = index < prepareEdges.getEdges(node);
-                if (!result) {
+                if (index >= prepareEdges.size(node)) {
                     currEdge = null;
                     return false;
                 }
                 currEdge = prepareEdges.get(node, index);
-                if (!currEdge.isShortcut() || ((!reverse && currEdge.getNodeA() == node) || (reverse && currEdge.getNodeB() == node)))
+                if (!currEdge.isShortcut())
+                    return true;
+                if ((!reverse && nodeAisBase()) || (reverse && currEdge.getNodeB() == node))
                     return true;
             }
         }
@@ -311,10 +315,7 @@ public class CHPreparationGraph {
 
         @Override
         public int getAdjNode() {
-            if (currEdge.getNodeA() == node)
-                return currEdge.getNodeB();
-            else
-                return currEdge.getNodeA();
+            return nodeAisBase() ? currEdge.getNodeB() : currEdge.getNodeA();
         }
 
         @Override
@@ -329,15 +330,12 @@ public class CHPreparationGraph {
 
         @Override
         public int getOrigEdgeKeyFirst() {
-            if (currEdge.getNodeA() == node)
-                return currEdge.getOrigEdgeKeyFirstAB();
-            else
-                return currEdge.getOrigEdgeKeyFirstBA();
+            return nodeAisBase() ? currEdge.getOrigEdgeKeyFirstAB() : currEdge.getOrigEdgeKeyFirstBA();
         }
 
         @Override
         public int getOrigEdgeKeyLast() {
-            if (currEdge.getNodeA() == node)
+            if (nodeAisBase())
                 return currEdge.getOrigEdgeKeyLastAB();
             else
                 return currEdge.getOrigEdgeKeyLastBA();
@@ -355,12 +353,11 @@ public class CHPreparationGraph {
 
         @Override
         public double getWeight() {
-            boolean sitsAtA = node == currEdge.getNodeA();
-            if (!reverse && sitsAtA)
+            if (!reverse && nodeAisBase())
                 return currEdge.getWeightAB();
             else if (!reverse)
                 return currEdge.getWeightBA();
-            else if (sitsAtA)
+            else if (nodeAisBase())
                 return currEdge.getWeightBA();
             else
                 return currEdge.getWeightAB();
@@ -391,6 +388,11 @@ public class CHPreparationGraph {
         @Override
         public String toString() {
             return index < 0 ? "not_started" : getBaseNode() + "-" + getAdjNode();
+        }
+
+        private boolean nodeAisBase() {
+            // in some cases we need to determine which direction of the (bidirectional) edge we want
+            return currEdge.getNodeA() == node;
         }
     }
 
@@ -858,5 +860,65 @@ public class CHPreparationGraph {
             result[i] = arr[sortOrder[i]];
         }
         return result;
+    }
+
+    /**
+     * This is a more memory-efficient version of `ArrayList<T>[]`, i.e. this is a fixed size array with variable
+     * sized sub-arrays. It is more memory efficient than an array of `ArrayList`s, because it saves the object-overhead
+     * of using an ArrayList object for each sub-array.
+     */
+    private static class Array2D<T> {
+        private static final int GROW_FACTOR = 2;
+        private final int initialSubArrayCapacity;
+        private final Object[][] data;
+        private final int[] sizes;
+
+        Array2D(int size, int initialSubArrayCapacity) {
+            data = new Object[size][];
+            sizes = new int[size];
+            this.initialSubArrayCapacity = initialSubArrayCapacity;
+        }
+
+        int size(int subArray) {
+            return sizes[subArray];
+        }
+
+        void add(int subArray, T element) {
+            if (data[subArray] == null) {
+                data[subArray] = new Object[initialSubArrayCapacity];
+                data[subArray][0] = element;
+                sizes[subArray] = 1;
+            } else {
+                assert data[subArray].length != 0;
+                if (sizes[subArray] == data[subArray].length)
+                    data[subArray] = Arrays.copyOf(data[subArray], data[subArray].length * GROW_FACTOR);
+                data[subArray][sizes[subArray]] = element;
+                sizes[subArray]++;
+            }
+        }
+
+        T get(int subArray, int element) {
+            return (T) data[subArray][element];
+        }
+
+        /**
+         * Removes the given element from the given sub-array. Using this method changes the order of the existing elements
+         * in the sub-array unless we remove the very last element!
+         */
+        void remove(int subArray, T element) {
+            for (int i = 0; i < sizes[subArray]; i++) {
+                if (data[subArray][i] == element) {
+                    data[subArray][i] = data[subArray][sizes[subArray] - 1];
+                    data[subArray][sizes[subArray] - 1] = null;
+                    sizes[subArray]--;
+                }
+            }
+        }
+
+        void clear(int subArray) {
+            data[subArray] = null;
+            sizes[subArray] = 0;
+        }
+
     }
 }
