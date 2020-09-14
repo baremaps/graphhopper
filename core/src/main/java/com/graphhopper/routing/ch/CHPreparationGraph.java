@@ -299,7 +299,7 @@ public class CHPreparationGraph {
                     return false;
                 }
                 currEdge = prepareEdges.get(node, index);
-                if (currEdge != null && (!currEdge.isShortcut() || ((!reverse && currEdge.getNodeA() == node) || (reverse && currEdge.getNodeB() == node))))
+                if (!currEdge.isShortcut() || ((!reverse && currEdge.getNodeA() == node) || (reverse && currEdge.getNodeB() == node)))
                     return true;
             }
         }
