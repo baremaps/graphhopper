@@ -44,6 +44,11 @@ public class CHPreparationGraph {
     private final int edges;
     private final boolean edgeBased;
     private final TurnCostFunction turnCostFunction;
+    // each edge/shortcut between nodes a/b is represented as a single object and we maintain a list of references
+    // to these objects at every node. this needs to be memory-efficient especially for node-based (because there
+    // are less shortcuts overall so the size of the prepare graph is crucial, while for edge-based most memory is
+    // consumed towards the end of the preparation anyway). for edge-based it would actually be better/faster to keep
+    // separate lists of incoming/outgoing edges and even use uni-directional edge-objects.
     private Array2D<PrepareEdge> prepareEdges;
     private IntSet neighborSet;
     private OrigGraph origGraph;
