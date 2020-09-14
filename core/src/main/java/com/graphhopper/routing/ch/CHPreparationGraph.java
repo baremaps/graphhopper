@@ -94,7 +94,7 @@ public class CHPreparationGraph {
         while (iter.next()) {
             double weightFwd = iter.get(accessEnc) ? weighting.calcEdgeWeight(iter, false) : Double.POSITIVE_INFINITY;
             double weightBwd = iter.getReverse(accessEnc) ? weighting.calcEdgeWeight(iter, true) : Double.POSITIVE_INFINITY;
-            prepareGraph.addEdge(iter.getBaseNode(), iter.getAdjNode(), iter.getEdge(), weightFwd, weightBwd);
+            prepareGraph.addEdge(iter.getBaseNode(), iter.getAdjNode(), iter.getEdge(), (float) weightFwd, (float) weightBwd);
         }
         prepareGraph.prepareForContraction();
     }
@@ -171,7 +171,7 @@ public class CHPreparationGraph {
         return outEdges.get(node).size() + inEdges.get(node).size();
     }
 
-    public void addEdge(int from, int to, int edge, double weightFwd, double weightBwd) {
+    public void addEdge(int from, int to, int edge, float weightFwd, float weightBwd) {
         checkNotReady();
         boolean fwd = Double.isFinite(weightFwd);
         boolean bwd = Double.isFinite(weightBwd);
@@ -430,14 +430,14 @@ public class CHPreparationGraph {
         private final int prepareEdge;
         private final int from;
         private final int to;
-        private final double weight;
+        private final float weight;
         private final int origKey;
 
-        private PrepareBaseEdge(int prepareEdge, int from, int to, double weight, int origKey) {
+        private PrepareBaseEdge(int prepareEdge, int from, int to, float weight, int origKey) {
             this.prepareEdge = prepareEdge;
             this.from = from;
             this.to = to;
-            assert Double.isFinite(weight);
+            assert Float.isFinite(weight);
             this.weight = weight;
             this.origKey = origKey;
         }
