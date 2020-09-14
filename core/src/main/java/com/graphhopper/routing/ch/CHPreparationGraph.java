@@ -293,13 +293,14 @@ public class CHPreparationGraph {
         public boolean next() {
             while (true) {
                 index++;
-                boolean result = index < prepareEdges.getEdges(node);
-                if (!result) {
+                if (index == prepareEdges.getEdges(node)) {
                     currEdge = null;
                     return false;
                 }
                 currEdge = prepareEdges.get(node, index);
-                if (!currEdge.isShortcut() || ((!reverse && currEdge.getNodeA() == node) || (reverse && currEdge.getNodeB() == node)))
+                if (!currEdge.isShortcut() && Double.isFinite(getWeight())) {
+                    return true;
+                } else if ((!reverse && currEdge.getNodeA() == node) || (reverse && currEdge.getNodeB() == node))
                     return true;
             }
         }
