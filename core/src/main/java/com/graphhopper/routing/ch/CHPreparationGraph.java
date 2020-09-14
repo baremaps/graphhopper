@@ -299,7 +299,6 @@ public class CHPreparationGraph {
 
         @Override
         public boolean next() {
-            // todonow: try 'caching' values that depend on direction?
             while (true) {
                 index++;
                 if (index >= prepareEdges.size(node)) {
@@ -308,10 +307,13 @@ public class CHPreparationGraph {
                 }
                 currEdge = prepareEdges.get(node, index);
                 // todonow: move out weight getter and maybe use createEdgeExplorer()?
-                if (!currEdge.isShortcut() && Double.isFinite(getWeight()))
-                    return true;
-                if ((!reverse && nodeAisBase()) || (reverse && currEdge.getNodeB() == node))
-                    return true;
+                if (!currEdge.isShortcut()) {
+                    if (Double.isFinite(getWeight()))
+                        return true;
+                } else {
+                    if ((!reverse && nodeAisBase()) || (reverse && currEdge.getNodeB() == node))
+                        return true;
+                }
             }
         }
 
@@ -342,10 +344,7 @@ public class CHPreparationGraph {
 
         @Override
         public int getOrigEdgeKeyLast() {
-            if (nodeAisBase())
-                return currEdge.getOrigEdgeKeyLastAB();
-            else
-                return currEdge.getOrigEdgeKeyLastBA();
+            return nodeAisBase() ? currEdge.getOrigEdgeKeyLastAB() : currEdge.getOrigEdgeKeyLastBA();
         }
 
         @Override
@@ -360,14 +359,11 @@ public class CHPreparationGraph {
 
         @Override
         public double getWeight() {
-            if (!reverse && nodeAisBase())
-                return currEdge.getWeightAB();
-            else if (!reverse)
-                return currEdge.getWeightBA();
-            else if (nodeAisBase())
-                return currEdge.getWeightBA();
-            else
-                return currEdge.getWeightAB();
+            if (nodeAisBase()) {
+                return reverse ? currEdge.getWeightBA() : currEdge.getWeightAB();
+            } else {
+                return reverse ? currEdge.getWeightAB() : currEdge.getWeightBA();
+            }
         }
 
         @Override
