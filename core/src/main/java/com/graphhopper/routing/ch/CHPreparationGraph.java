@@ -299,6 +299,7 @@ public class CHPreparationGraph {
 
         @Override
         public boolean next() {
+            // todonow: try 'caching' values that depend on direction?
             while (true) {
                 index++;
                 if (index >= prepareEdges.size(node)) {
@@ -306,7 +307,8 @@ public class CHPreparationGraph {
                     return false;
                 }
                 currEdge = prepareEdges.get(node, index);
-                if (!currEdge.isShortcut())
+                // todonow: move out weight getter and maybe use createEdgeExplorer()?
+                if (!currEdge.isShortcut() && Double.isFinite(getWeight()))
                     return true;
                 if ((!reverse && nodeAisBase()) || (reverse && currEdge.getNodeB() == node))
                     return true;
