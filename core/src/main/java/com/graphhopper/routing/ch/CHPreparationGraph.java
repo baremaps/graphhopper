@@ -47,7 +47,7 @@ public class CHPreparationGraph {
     // are less shortcuts overall so the size of the prepare graph is crucial, while for edge-based most memory is
     // consumed towards the end of the preparation anyway). for edge-based it would actually be better/faster to keep
     // separate lists of incoming/outgoing edges and even use uni-directional edge-objects.
-    private Array2D<PrepareEdge> prepareEdges;
+    private SplitArray2D<PrepareEdge> prepareEdges;
     private IntSet neighborSet;
     private OrigGraph origGraph;
     private OrigGraph.Builder origGraphBuilder;
@@ -72,7 +72,7 @@ public class CHPreparationGraph {
         this.nodes = nodes;
         this.edges = edges;
         this.edgeBased = edgeBased;
-        prepareEdges = new Array2D<>(nodes, 2);
+        prepareEdges = new SplitArray2D<>(nodes, 2);
         origGraphBuilder = edgeBased ? new OrigGraph.Builder() : null;
         neighborSet = new IntHashSet();
         nextShortcutId = edges;
@@ -176,12 +176,12 @@ public class CHPreparationGraph {
         // todonow: is it ok to cast to float? maybe add some check that asserts certain precision? especially inf?
         PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, from, to, (float) weightFwd, (float) weightBwd);
         if (Double.isFinite(weightFwd)) {
-            prepareEdges.addOut(from, prepareEdge);
-            prepareEdges.addIn(to, prepareEdge);
+            addOutEdge(from, prepareEdge);
+            addInEdge(to, prepareEdge);
         }
         if (Double.isFinite(weightBwd) && from != to) {
-            prepareEdges.addOut(to, prepareEdge);
-            prepareEdges.addIn(from, prepareEdge);
+            addOutEdge(to, prepareEdge);
+            addInEdge(from, prepareEdge);
         }
         if (edgeBased)
             origGraphBuilder.addEdge(from, to, edge, fwd, bwd);
@@ -193,8 +193,8 @@ public class CHPreparationGraph {
         PrepareEdge prepareEdge = edgeBased
                 ? new EdgeBasedPrepareShortcut(nextShortcutId, from, to, origEdgeKeyFirst, origEdgeKeyLast, weight, skipped1, skipped2, origEdgeCount)
                 : new PrepareShortcut(nextShortcutId, from, to, weight, skipped1, skipped2, origEdgeCount);
-        prepareEdges.addOut(from, prepareEdge);
-        prepareEdges.addIn(to, prepareEdge);
+        addOutEdge(from, prepareEdge);
+        addInEdge(to, prepareEdge);
         return nextShortcutId++;
     }
 
@@ -264,6 +264,14 @@ public class CHPreparationGraph {
             origGraph = null;
     }
 
+    private void addOutEdge(int node, PrepareEdge prepareEdge) {
+        prepareEdges.addPartTwo(node, prepareEdge);
+    }
+
+    private void addInEdge(int node, PrepareEdge prepareEdge) {
+        prepareEdges.addPartOne(node, prepareEdge);
+    }
+
     private void checkReady() {
         if (!ready)
             throw new IllegalStateException("You need to call prepareForContraction() before calling this method");
@@ -280,14 +288,14 @@ public class CHPreparationGraph {
     }
 
     private static class PrepareGraphEdgeExplorerImpl implements PrepareGraphEdgeExplorer, PrepareGraphEdgeIterator {
-        private final Array2D<PrepareEdge> prepareEdges;
+        private final SplitArray2D<PrepareEdge> prepareEdges;
         private final boolean reverse;
         private int node = -1;
         private int end;
         private PrepareEdge currEdge;
         private int index;
 
-        PrepareGraphEdgeExplorerImpl(Array2D<PrepareEdge> prepareEdges, boolean reverse) {
+        PrepareGraphEdgeExplorerImpl(SplitArray2D<PrepareEdge> prepareEdges, boolean reverse) {
             this.prepareEdges = prepareEdges;
             this.reverse = reverse;
         }
@@ -295,8 +303,9 @@ public class CHPreparationGraph {
         @Override
         public PrepareGraphEdgeIterator setBaseNode(int node) {
             this.node = node;
-            this.index = reverse ? -1 : (prepareEdges.sizeIn(node) - 1);
-            this.end = reverse ? prepareEdges.sizeIn(node) : prepareEdges.size(node);
+            // we store the in edges in the first and the out edges in the second part of the prepareEdges
+            this.index = reverse ? -1 : (prepareEdges.mid(node) - 1);
+            this.end = reverse ? prepareEdges.mid(node) : prepareEdges.size(node);
             return this;
         }
 
@@ -384,8 +393,7 @@ public class CHPreparationGraph {
 
         @Override
         public String toString() {
-            // todonow
-            return index < 0 ? "not_started" : getBaseNode() + "-" + getAdjNode();
+            return currEdge == null ? "not_started" : getBaseNode() + "-" + getAdjNode();
         }
 
         private boolean nodeAisBase() {

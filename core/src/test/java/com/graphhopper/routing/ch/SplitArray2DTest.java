@@ -25,38 +25,38 @@ import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class Array2DTest {
+class SplitArray2DTest {
 
     @Test
     void basic() {
-        Array2D<Integer> arr = new Array2D<>(5, 1);
+        SplitArray2D<Integer> arr = new SplitArray2D<>(5, 1);
         final int n = 1;
         IntStream.range(0, 5).forEach(i -> assertEquals(0, arr.size(i)));
-        IntStream.range(0, 5).forEach(i -> assertEquals(0, arr.sizeIn(i)));
-        arr.addIn(n, 5);
-        arr.addOut(n, 6);
-        arr.addIn(n, 4);
-        arr.addOut(n, 5);
-        arr.addOut(n, 7);
-        arr.addOut(n, 6);
-        assertEquals(2, arr.sizeIn(n));
+        IntStream.range(0, 5).forEach(i -> assertEquals(0, arr.mid(i)));
+        arr.addPartOne(n, 5);
+        arr.addPartTwo(n, 6);
+        arr.addPartOne(n, 4);
+        arr.addPartTwo(n, 5);
+        arr.addPartTwo(n, 7);
+        arr.addPartTwo(n, 6);
+        assertEquals(2, arr.mid(n));
         assertEquals(6, arr.size(n));
         assertEquals(IntArrayList.from(5, 4), getIn(arr, n));
         assertEquals(IntArrayList.from(6, 5, 7, 6), getOut(arr, n));
         arr.remove(n, 6);
-        assertEquals(2, arr.sizeIn(n));
+        assertEquals(2, arr.mid(n));
         assertEquals(4, arr.size(n));
         arr.remove(n, 5);
         assertEquals(IntArrayList.from(4), getIn(arr, n));
         assertEquals(IntArrayList.from(7), getOut(arr, n));
-        assertEquals(n, arr.sizeIn(n));
+        assertEquals(n, arr.mid(n));
         assertEquals(2, arr.size(n));
         arr.clear(n);
-        assertEquals(0, arr.sizeIn(n));
+        assertEquals(0, arr.mid(n));
         assertEquals(0, arr.size(n));
-        arr.addOut(n, 23);
-        arr.addIn(n, 17);
-        assertEquals(1, arr.sizeIn(n));
+        arr.addPartTwo(n, 23);
+        arr.addPartOne(n, 17);
+        assertEquals(1, arr.mid(n));
         assertEquals(2, arr.size(n));
         assertEquals(17, arr.get(n, 0));
         assertEquals(23, arr.get(n, 1));
@@ -66,14 +66,14 @@ class Array2DTest {
 
     @Test
     void remove() {
-        Array2D<Integer> arr = new Array2D<>(3, 1);
-        arr.addIn(0, 3);
-        arr.addIn(0, 2);
-        arr.addIn(0, 4);
-        arr.addIn(0, 6);
-        arr.addOut(0, 1);
-        arr.addOut(0, 8);
-        arr.addOut(0, 2);
+        SplitArray2D<Integer> arr = new SplitArray2D<>(3, 1);
+        arr.addPartOne(0, 3);
+        arr.addPartOne(0, 2);
+        arr.addPartOne(0, 4);
+        arr.addPartOne(0, 6);
+        arr.addPartTwo(0, 1);
+        arr.addPartTwo(0, 8);
+        arr.addPartTwo(0, 2);
         assertEquals(IntArrayList.from(3, 2, 4, 6), getIn(arr, 0));
         assertEquals(IntArrayList.from(1, 8, 2), getOut(arr, 0));
         arr.remove(0, 2);
@@ -83,20 +83,20 @@ class Array2DTest {
 
     @Test
     void remove2() {
-        Array2D<Integer> arr = new Array2D<>(3, 1);
-        arr.addIn(0, 3);
-        arr.addIn(0, 2);
-        arr.addIn(0, 4);
-        arr.addIn(0, 4);
-        arr.addIn(0, 4);
-        arr.addIn(0, 6);
-        arr.addIn(0, 4);
-        arr.addOut(0, 1);
-        arr.addOut(0, 3);
-        arr.addOut(0, 2);
-        arr.addOut(0, 1);
-        arr.addOut(0, 1);
-        arr.addOut(0, 4);
+        SplitArray2D<Integer> arr = new SplitArray2D<>(3, 1);
+        arr.addPartOne(0, 3);
+        arr.addPartOne(0, 2);
+        arr.addPartOne(0, 4);
+        arr.addPartOne(0, 4);
+        arr.addPartOne(0, 4);
+        arr.addPartOne(0, 6);
+        arr.addPartOne(0, 4);
+        arr.addPartTwo(0, 1);
+        arr.addPartTwo(0, 3);
+        arr.addPartTwo(0, 2);
+        arr.addPartTwo(0, 1);
+        arr.addPartTwo(0, 1);
+        arr.addPartTwo(0, 4);
 
         assertEquals(IntArrayList.from(3, 2, 4, 4, 4, 6, 4), getIn(arr, 0));
         assertEquals(IntArrayList.from(1, 3, 2, 1, 1, 4), getOut(arr, 0));
@@ -113,11 +113,11 @@ class Array2DTest {
 
     @Test
     void remove3() {
-        Array2D<Integer> arr = new Array2D<>(3, 1);
-        arr.addIn(0, 1);
-        arr.addIn(0, 2);
-        arr.addOut(0, 1);
-        arr.addOut(0, 2);
+        SplitArray2D<Integer> arr = new SplitArray2D<>(3, 1);
+        arr.addPartOne(0, 1);
+        arr.addPartOne(0, 2);
+        arr.addPartTwo(0, 1);
+        arr.addPartTwo(0, 2);
         assertEquals(IntArrayList.from(1, 2), getIn(arr, 0));
         assertEquals(IntArrayList.from(1, 2), getOut(arr, 0));
         arr.remove(0, 2);
@@ -125,15 +125,15 @@ class Array2DTest {
         assertEquals(IntArrayList.from(1), getOut(arr, 0));
     }
 
-    private IntArrayList getIn(Array2D<Integer> arr, int n) {
-        return getRange(arr, n, 0, arr.sizeIn(n));
+    private IntArrayList getIn(SplitArray2D<Integer> arr, int n) {
+        return getRange(arr, n, 0, arr.mid(n));
     }
 
-    private IntArrayList getOut(Array2D<Integer> arr, int n) {
-        return getRange(arr, n, arr.sizeIn(n), arr.size(n));
+    private IntArrayList getOut(SplitArray2D<Integer> arr, int n) {
+        return getRange(arr, n, arr.mid(n), arr.size(n));
     }
 
-    private IntArrayList getRange(Array2D<Integer> arr, int n, int start, int end) {
+    private IntArrayList getRange(SplitArray2D<Integer> arr, int n, int start, int end) {
         IntArrayList res = new IntArrayList();
         for (int i = start; i < end; i++) {
             res.add(arr.get(n, i));
