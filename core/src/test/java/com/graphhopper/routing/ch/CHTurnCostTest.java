@@ -991,9 +991,9 @@ public class CHTurnCostTest {
         Dijkstra dijkstra = new Dijkstra(queryGraph, w, TraversalMode.EDGE_BASED);
         Path dijkstraPath = dijkstra.calcPath(4, 6);
         assertEquals(IntArrayList.from(4, 3, 2, 1, 7, 0, 7, 1, 5, 6), dijkstraPath.calcNodes());
-        assertEquals(dijkstraPath.getWeight(), path.getWeight(), 1.e-3);
-        assertEquals(dijkstraPath.getDistance(), path.getDistance(), 1.e-3);
-        assertEquals(dijkstraPath.getTime(), path.getTime(), 1.e-3);
+        assertEquals(dijkstraPath.getWeight(), path.getWeight(), 1.e-2);
+        assertEquals(dijkstraPath.getDistance(), path.getDistance(), 1.e-2);
+        assertEquals(dijkstraPath.getTime(), path.getTime());
     }
 
     /**

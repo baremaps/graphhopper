@@ -49,8 +49,8 @@ class CHPreparationGraphTest {
         PrepareGraphEdgeIterator iter = pg.createOutEdgeExplorer().setBaseNode(3);
         String res = "";
         while (iter.next()) {
-            res += iter.toString();
+            res += iter.toString() + ",";
         }
-        assertEquals("3-4", res);
+        assertEquals("3-4,", res);
     }
 }
