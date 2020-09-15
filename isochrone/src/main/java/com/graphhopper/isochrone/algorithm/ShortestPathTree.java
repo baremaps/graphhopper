@@ -33,6 +33,7 @@ import java.util.function.Consumer;
 
 import static com.graphhopper.isochrone.algorithm.ShortestPathTree.ExploreType.*;
 import static java.util.Comparator.comparingDouble;
+import static java.util.Comparator.comparingLong;
 
 /**
  * Computes a shortest path tree by a given weighting. Terminates when all shortest paths up to
@@ -85,7 +86,8 @@ public class ShortestPathTree extends AbstractRoutingAlgorithm {
     }
 
     private IntObjectHashMap<IsoLabel> fromMap;
-    private PriorityQueue<IsoLabel> queueByWeighting;
+    private PriorityQueue<IsoLabel> queueByWeighting; // a.k.a. the Dijkstra queue
+    private PriorityQueue<IsoLabel> queueByZ; // so we know when we are finished
     private int visitedNodes;
     private double limit = -1;
     private ExploreType exploreType = TIME;
@@ -94,6 +96,7 @@ public class ShortestPathTree extends AbstractRoutingAlgorithm {
     public ShortestPathTree(Graph g, Weighting weighting, boolean reverseFlow, TraversalMode traversalMode) {
         super(g, weighting, traversalMode);
         queueByWeighting = new PriorityQueue<>(1000, comparingDouble(l -> l.weight));
+        queueByZ = new PriorityQueue<>(1000);
         fromMap = new GHIntObjectHashMap<>(1000);
         this.reverseFlow = reverseFlow;
     }
@@ -109,6 +112,7 @@ public class ShortestPathTree extends AbstractRoutingAlgorithm {
     public void setTimeLimit(double limit) {
         exploreType = TIME;
         this.limit = limit;
+        this.queueByZ = new PriorityQueue<>(1000, comparingLong(l -> l.time));
     }
 
     /**
@@ -117,17 +121,20 @@ public class ShortestPathTree extends AbstractRoutingAlgorithm {
     public void setDistanceLimit(double limit) {
         exploreType = DISTANCE;
         this.limit = limit;
+        this.queueByZ = new PriorityQueue<>(1000, comparingDouble(l -> l.distance));
     }
 
     public void setWeightLimit(double limit) {
         exploreType = WEIGHT;
         this.limit = limit;
+        this.queueByZ = new PriorityQueue<>(1000, comparingDouble(l -> l.weight));
     }
 
     public void search(int from, final Consumer<IsoLabel> consumer) {
         checkAlreadyRun();
         IsoLabel currentLabel = new IsoLabel(from, -1, 0, 0, 0, null);
         queueByWeighting.add(currentLabel);
+        queueByZ.add(currentLabel);
         if (traversalMode == TraversalMode.NODE_BASED) {
             fromMap.put(from, currentLabel);
         }
@@ -136,7 +143,9 @@ public class ShortestPathTree extends AbstractRoutingAlgorithm {
             currentLabel = queueByWeighting.poll();
             if (currentLabel.deleted)
                 continue;
-            consumer.accept(currentLabel);
+            if (getExploreValue(currentLabel) <= limit) {
+                consumer.accept(currentLabel);
+            }
             currentLabel.deleted = true;
             visitedNodes++;
 
@@ -156,20 +165,18 @@ public class ShortestPathTree extends AbstractRoutingAlgorithm {
                 double nextDistance = iter.getDistance() + currentLabel.distance;
                 long nextTime = GHUtility.calcMillisWithTurnMillis(weighting, iter, reverseFlow, currentLabel.edge) + currentLabel.time;
                 int nextTraversalId = traversalMode.createTraversalId(iter, reverseFlow);
-                IsoLabel label = fromMap.get(nextTraversalId);
-                if (label == null) {
-                    label = new IsoLabel(iter.getAdjNode(), iter.getEdge(), nextWeight, nextTime, nextDistance, currentLabel);
-                    if (getExploreValue(label) <= limit) {
-                        fromMap.put(nextTraversalId, label);
-                        queueByWeighting.add(label);
-                    }
-                } else if (label.weight > nextWeight) {
-                    label.deleted = true;
-                    label = new IsoLabel(iter.getAdjNode(), iter.getEdge(), nextWeight, nextTime, nextDistance, currentLabel);
-                    if (getExploreValue(label) <= limit) {
-                        fromMap.put(nextTraversalId, label);
-                        queueByWeighting.add(label);
-                    }
+                IsoLabel nextLabel = fromMap.get(nextTraversalId);
+                if (nextLabel == null) {
+                    nextLabel = new IsoLabel(iter.getAdjNode(), iter.getEdge(), nextWeight, nextTime, nextDistance, currentLabel);
+                    fromMap.put(nextTraversalId, nextLabel);
+                    queueByWeighting.add(nextLabel);
+                    queueByZ.add(nextLabel);
+                } else if (nextLabel.weight > nextWeight) {
+                    nextLabel.deleted = true;
+                    nextLabel = new IsoLabel(iter.getAdjNode(), iter.getEdge(), nextWeight, nextTime, nextDistance, currentLabel);
+                    fromMap.put(nextTraversalId, nextLabel);
+                    queueByWeighting.add(nextLabel);
+                    queueByZ.add(nextLabel);
                 }
             }
         }
@@ -185,7 +192,11 @@ public class ShortestPathTree extends AbstractRoutingAlgorithm {
 
     @Override
     protected boolean finished() {
-        return queueByWeighting.isEmpty();
+        while (queueByZ.peek() != null && queueByZ.peek().deleted)
+            queueByZ.poll();
+        if (queueByZ.peek() == null)
+            return true;
+        return getExploreValue(queueByZ.peek()) >= limit;
     }
 
     @Override

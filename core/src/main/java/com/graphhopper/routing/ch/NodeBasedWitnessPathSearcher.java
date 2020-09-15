@@ -34,7 +34,7 @@ import java.util.Arrays;
  */
 public class NodeBasedWitnessPathSearcher {
     private static final int NOT_FOUND = -1;
-    private PrepareGraphEdgeExplorer outEdgeExplorer;
+    private final PrepareGraphEdgeExplorer outEdgeExplorer;
     private final IntArrayList changedNodes;
     private int maxVisitedNodes = Integer.MAX_VALUE;
     protected double[] weights;
@@ -158,8 +158,6 @@ public class NodeBasedWitnessPathSearcher {
     }
 
     public void close() {
-        outEdgeExplorer = null;
-        changedNodes.release();
         weights = null;
         heap = null;
     }
