@@ -173,19 +173,12 @@ public class CHPreparationGraph {
         boolean bwd = Double.isFinite(weightBwd);
         if (!fwd && !bwd)
             return;
+        PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, from, to, (float) weightFwd, (float) weightBwd);
         if (fwd) {
-            int key = edge << 1;
-            if (from > to)
-                key += 1;
-            PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, from, to, (float) weightFwd, key);
             addOutEdge(from, prepareEdge);
             addInEdge(to, prepareEdge);
         }
         if (bwd && from != to) {
-            int key = edge << 1;
-            if (to > from)
-                key += 1;
-            PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, to, from, (float) weightBwd, key);
             addOutEdge(to, prepareEdge);
             addInEdge(from, prepareEdge);
         }
@@ -332,7 +325,7 @@ public class CHPreparationGraph {
 
         @Override
         public int getAdjNode() {
-            return reverse ? currEdge.getNodeA() : currEdge.getNodeB();
+            return nodeAisBase() ? currEdge.getNodeB() : currEdge.getNodeA();
         }
 
         @Override
@@ -347,12 +340,12 @@ public class CHPreparationGraph {
 
         @Override
         public int getOrigEdgeKeyFirst() {
-            return currEdge.getOrigEdgeKeyFirst();
+            return nodeAisBase() ? currEdge.getOrigEdgeKeyFirstAB() : currEdge.getOrigEdgeKeyFirstBA();
         }
 
         @Override
         public int getOrigEdgeKeyLast() {
-            return currEdge.getOrigEdgeKeyLast();
+            return nodeAisBase() ? currEdge.getOrigEdgeKeyLastAB() : currEdge.getOrigEdgeKeyLastBA();
         }
 
         @Override
@@ -367,7 +360,11 @@ public class CHPreparationGraph {
 
         @Override
         public double getWeight() {
-            return currEdge.getWeight();
+            if (nodeAisBase()) {
+                return reverse ? currEdge.getWeightBA() : currEdge.getWeightAB();
+            } else {
+                return reverse ? currEdge.getWeightAB() : currEdge.getWeightBA();
+            }
         }
 
         @Override
@@ -397,6 +394,10 @@ public class CHPreparationGraph {
             return currEdge == null ? "not_started" : getBaseNode() + "-" + getAdjNode();
         }
 
+        private boolean nodeAisBase() {
+            // in some cases we need to determine which direction of the (bidirectional) edge we want
+            return currEdge.getNodeA() == node;
+        }
     }
 
     interface PrepareEdge {
@@ -408,11 +409,17 @@ public class CHPreparationGraph {
 
         int getNodeB();
 
-        double getWeight();
+        double getWeightAB();
 
-        int getOrigEdgeKeyFirst();
+        double getWeightBA();
 
-        int getOrigEdgeKeyLast();
+        int getOrigEdgeKeyFirstAB();
+
+        int getOrigEdgeKeyFirstBA();
+
+        int getOrigEdgeKeyLastAB();
+
+        int getOrigEdgeKeyLastBA();
 
         int getSkipped1();
 
@@ -433,15 +440,15 @@ public class CHPreparationGraph {
         private final int prepareEdge;
         private final int nodeA;
         private final int nodeB;
-        private final float weight;
-        private final int key;
+        private final float weightAB;
+        private final float weightBA;
 
-        public PrepareBaseEdge(int prepareEdge, int nodeA, int nodeB, float weight, int key) {
+        public PrepareBaseEdge(int prepareEdge, int nodeA, int nodeB, float weightAB, float weightBA) {
             this.prepareEdge = prepareEdge;
             this.nodeA = nodeA;
             this.nodeB = nodeB;
-            this.weight = weight;
-            this.key = key;
+            this.weightAB = weightAB;
+            this.weightBA = weightBA;
         }
 
         @Override
@@ -464,18 +471,36 @@ public class CHPreparationGraph {
             return nodeB;
         }
 
-        public double getWeight() {
-            return weight;
+        @Override
+        public double getWeightAB() {
+            return weightAB;
         }
 
         @Override
-        public int getOrigEdgeKeyFirst() {
-            return key;
+        public double getWeightBA() {
+            return weightBA;
         }
 
         @Override
-        public int getOrigEdgeKeyLast() {
-            return key;
+        public int getOrigEdgeKeyFirstAB() {
+            int key = prepareEdge << 1;
+            return nodeA > nodeB ? key + 1 : key;
+        }
+
+        @Override
+        public int getOrigEdgeKeyFirstBA() {
+            int key = prepareEdge << 1;
+            return nodeB > nodeA ? key + 1 : key;
+        }
+
+        @Override
+        public int getOrigEdgeKeyLastAB() {
+            return getOrigEdgeKeyFirstAB();
+        }
+
+        @Override
+        public int getOrigEdgeKeyLastBA() {
+            return getOrigEdgeKeyFirstBA();
         }
 
         @Override
@@ -515,7 +540,7 @@ public class CHPreparationGraph {
 
         @Override
         public String toString() {
-            return nodeA + "-" + nodeB + " (" + prepareEdge + ") " + weight;
+            return nodeA + "-" + nodeB + " (" + prepareEdge + ") " + weightAB + " " + weightBA;
         }
     }
 
@@ -560,17 +585,32 @@ public class CHPreparationGraph {
         }
 
         @Override
-        public double getWeight() {
+        public double getWeightAB() {
             return weight;
         }
 
         @Override
-        public int getOrigEdgeKeyFirst() {
+        public double getWeightBA() {
+            return weight;
+        }
+
+        @Override
+        public int getOrigEdgeKeyFirstAB() {
             throw new IllegalStateException("Not supported for node-based shortcuts");
         }
 
         @Override
-        public int getOrigEdgeKeyLast() {
+        public int getOrigEdgeKeyFirstBA() {
+            throw new IllegalStateException("Not supported for node-based shortcuts");
+        }
+
+        @Override
+        public int getOrigEdgeKeyLastAB() {
+            throw new IllegalStateException("Not supported for node-based shortcuts");
+        }
+
+        @Override
+        public int getOrigEdgeKeyLastBA() {
             throw new IllegalStateException("Not supported for node-based shortcuts");
         }
 
@@ -628,18 +668,28 @@ public class CHPreparationGraph {
         }
 
         @Override
-        public int getOrigEdgeKeyFirst() {
+        public int getOrigEdgeKeyFirstAB() {
             return origEdgeKeyFirst;
         }
 
         @Override
-        public int getOrigEdgeKeyLast() {
+        public int getOrigEdgeKeyFirstBA() {
+            return origEdgeKeyFirst;
+        }
+
+        @Override
+        public int getOrigEdgeKeyLastAB() {
+            return origEdgeKeyLast;
+        }
+
+        @Override
+        public int getOrigEdgeKeyLastBA() {
             return origEdgeKeyLast;
         }
 
         @Override
         public String toString() {
-            return getNodeA() + "-" + getNodeB() + " (" + origEdgeKeyFirst + ", " + origEdgeKeyLast + ") " + getWeight();
+            return getNodeA() + "-" + getNodeB() + " (" + origEdgeKeyFirst + ", " + origEdgeKeyLast + ") " + getWeightAB();
         }
     }
 

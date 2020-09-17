@@ -255,11 +255,11 @@ public final class GraphHopperStorage implements GraphStorage, Graph {
 
             checkIfConfiguredAndLoadedWeightingsCompatible();
 
-            // todonow: revert, only used for MyImport
-//            for (CHGraphImpl cg : chGraphs) {
-//                if (!cg.loadExisting())
-//                    throw new IllegalStateException("Cannot load " + cg);
-//            }
+            for (CHGraphImpl cg : chGraphs) {
+                if (!cg.loadExisting())
+                    throw new IllegalStateException("Cannot load " + cg);
+            }
+
             return true;
         }
         return false;
