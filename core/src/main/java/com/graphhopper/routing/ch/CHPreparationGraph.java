@@ -34,7 +34,7 @@ import com.graphhopper.util.EdgeIterator;
 import com.graphhopper.util.GHUtility;
 
 /**
- * Graph data structure used for CH preparation. It allows caching weights and edges that are not needed anymore
+ * Graph data structure used for CH preparation. It allows caching weights, and edges that are not needed anymore
  * (those adjacent to contracted nodes) can be removed (see {@link #disconnect}.
  */
 public class CHPreparationGraph {
@@ -114,8 +114,6 @@ public class CHPreparationGraph {
         DoubleArrayList turnCosts = new DoubleArrayList();
         // for each node we store the index of the first turn cost entry/triple in the list
         final int[] turnCostNodes = new int[graph.getNodes() + 1];
-        // todonow: get rid of this hack... / obtain the u-turn costs directly from weighting
-        double uTurnCosts = weighting.calcTurnWeight(1, 0, 1);
         TurnCostStorage.TurnRelationIterator tcIter = turnCostStorage.getAllTurnRelations();
         int lastNode = -1;
         while (tcIter.next()) {
@@ -123,8 +121,8 @@ public class CHPreparationGraph {
             if (viaNode < lastNode)
                 throw new IllegalStateException();
             long edgePair = BitUtil.LITTLE.combineIntsToLong(tcIter.getFromEdge(), tcIter.getToEdge());
+            // note that as long as we only use OSM turn restrictions all the turn costs are infinite anyway
             double turnCost = tcIter.getCost(turnCostEnc);
-            // todonow: do not forget that for pure OSM this is always infinite currently...
             int index = turnCostEdgePairs.size();
             turnCostEdgePairs.add(edgePair);
             turnCosts.add(turnCost);
@@ -140,6 +138,8 @@ public class CHPreparationGraph {
         }
         turnCostNodes[turnCostNodes.length - 1] = turnCostEdgePairs.size();
 
+        // currently the u-turn costs are the same for all junctions, so for now we just get them for one of them
+        double uTurnCosts = weighting.calcTurnWeight(1, 0, 1);
         return (inEdge, viaNode, outEdge) -> {
             if (!EdgeIterator.Edge.isValid(inEdge) || !EdgeIterator.Edge.isValid(outEdge))
                 return 0;
@@ -173,13 +173,12 @@ public class CHPreparationGraph {
         boolean bwd = Double.isFinite(weightBwd);
         if (!fwd && !bwd)
             return;
-        // todonow: is it ok to cast to float? maybe add some check that asserts certain precision? especially inf?
         PrepareBaseEdge prepareEdge = new PrepareBaseEdge(edge, from, to, (float) weightFwd, (float) weightBwd);
-        if (Double.isFinite(weightFwd)) {
+        if (fwd) {
             addOutEdge(from, prepareEdge);
             addInEdge(to, prepareEdge);
         }
-        if (Double.isFinite(weightBwd) && from != to) {
+        if (bwd && from != to) {
             addOutEdge(to, prepareEdge);
             addInEdge(from, prepareEdge);
         }
@@ -194,7 +193,8 @@ public class CHPreparationGraph {
                 ? new EdgeBasedPrepareShortcut(nextShortcutId, from, to, origEdgeKeyFirst, origEdgeKeyLast, weight, skipped1, skipped2, origEdgeCount)
                 : new PrepareShortcut(nextShortcutId, from, to, weight, skipped1, skipped2, origEdgeCount);
         addOutEdge(from, prepareEdge);
-        addInEdge(to, prepareEdge);
+        if (from != to)
+            addInEdge(to, prepareEdge);
         return nextShortcutId++;
     }
 
@@ -202,7 +202,6 @@ public class CHPreparationGraph {
         checkNotReady();
         origGraph = edgeBased ? origGraphBuilder.build() : null;
         origGraphBuilder = null;
-        // todo: performance - maybe sort the edges in some clever way?
         ready = true;
     }
 
@@ -485,34 +484,24 @@ public class CHPreparationGraph {
 
         @Override
         public int getOrigEdgeKeyFirstAB() {
-            int keyFwd = prepareEdge << 1;
-            if (nodeA > nodeB)
-                keyFwd += 1;
-            return keyFwd;
+            int key = prepareEdge << 1;
+            return nodeA > nodeB ? key + 1 : key;
         }
 
         @Override
         public int getOrigEdgeKeyFirstBA() {
-            int keyBwd = prepareEdge << 1;
-            if (nodeB > nodeA)
-                keyBwd += 1;
-            return keyBwd;
+            int key = prepareEdge << 1;
+            return nodeB > nodeA ? key + 1 : key;
         }
 
         @Override
         public int getOrigEdgeKeyLastAB() {
-            int keyFwd = prepareEdge << 1;
-            if (nodeA > nodeB)
-                keyFwd += 1;
-            return keyFwd;
+            return getOrigEdgeKeyFirstAB();
         }
 
         @Override
         public int getOrigEdgeKeyLastBA() {
-            int keyBwd = prepareEdge << 1;
-            if (nodeB > nodeA)
-                keyBwd += 1;
-            return keyBwd;
+            return getOrigEdgeKeyFirstBA();
         }
 
         @Override
@@ -705,10 +694,17 @@ public class CHPreparationGraph {
         }
     }
 
+    /**
+     * This helper graph can be used to quickly obtain the edge-keys of the edges of a node. It is only used for
+     * edge-based CH. In principle we could use base graph for this, but it turned out it is faster to use this
+     * graph (because it does not need to read all the edge flags to determine the access flags).
+     */
     private static class OrigGraph {
-        private final IntArrayList firstEdgesByNode;
+        // we store a list of 'edges' in the format: adjNode|edgeId|accessFlags, we use two ints for each edge
         private final IntArrayList adjNodes;
         private final IntArrayList edgesAndFlags;
+        // for each node we store the index at which the edges for this node begin in the above edge list
+        private final IntArrayList firstEdgesByNode;
 
         private OrigGraph(IntArrayList firstEdgesByNode, IntArrayList adjNodes, IntArrayList edgesAndFlags) {
             this.firstEdgesByNode = firstEdgesByNode;
